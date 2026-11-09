@@ -15,12 +15,18 @@ let session={role:'founder',display:'Beatriz'};const isFounder=()=>session.role=
 document.querySelector('.brand').onclick=e=>{e.preventDefault();navigate('map')};
 function leaveDemo(){sessionStorage.removeItem('mews.demo.account');location.reload()}
 async function api(path, options = {}) {
-  const response = await fetch(path, { credentials: 'same-origin', cache: 'no-store', ...options });
+  const headers = new Headers(options.headers || {});
+  if (connected && session.userId) headers.set('X-Mews-User', session.userId);
+  const response = await fetch(path, { credentials: 'same-origin', cache: 'no-store', ...options, headers });
   if (response.status === 401) {
     location.replace('/login');
     throw Error('Your session expired. Please sign in again.');
   }
   const payload = await response.json().catch(() => null);
+  if (payload?.error?.code === 'ACCOUNT_CHANGED') {
+    setConnectionLabel('Account changed · refresh');
+    throw Error('Your account changed in another tab. Refresh this page and check the signed-in name before sending.');
+  }
   if (!response.ok) throw Error((typeof payload?.error === 'string' ? payload.error : payload?.error?.message) || 'Request failed (HTTP ' + response.status + ').');
   return payload?.data ?? payload;
 }

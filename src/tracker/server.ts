@@ -66,6 +66,9 @@ export function createConnectedTracker(db: Db, uploadDir: string, analysisMode: 
       return res.end(await readFile(new URL("style.css", webRoot)));
     }
     if (path === "/api/tracker/logout" && method === "POST") {
+      const current = sessions.get(req);
+      if (current && req.headers["x-mews-user"] !== current.userId)
+        return json(res, 409, { error: { code: "ACCOUNT_CHANGED", message: "Account changed in another tab. Refresh before continuing." } });
       res.setHeader("Set-Cookie", sessions.logout(req));
       return json(res, 200, { ok: true });
     }
@@ -86,6 +89,9 @@ export function createConnectedTracker(db: Db, uploadDir: string, analysisMode: 
       const member = db.prepare("SELECT name FROM users WHERE id=?").get(actor.id) as { name: string };
       return json(res, 200, { userId: actor.id, display: member.name, role: actor.role === "staff" ? "founder" : "volunteer", analysisMode });
     }
+    if (path.startsWith("/api/") && ((req.headers["x-mews-user"] && req.headers["x-mews-user"] !== person.userId) ||
+        (method !== "GET" && req.headers["x-mews-user"] !== person.userId)))
+      return json(res, 409, { error: { code: "ACCOUNT_CHANGED", message: "Account changed in another tab. Refresh before continuing." } });
     const colonyPhoto = path === "/api/tracker/reference/marigold" || path === "/calico1.jpg" || path === "/calico2.jpg";
     if (colonyPhoto && actor.role !== "staff" && !actor.assignedColonyIds.includes("colony-1"))
       return json(res, 403, { error: "Colony access required" });
